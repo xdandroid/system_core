@@ -26,6 +26,7 @@
 #include <sys/reboot.h>
 
 #include "init.h"
+#include "init_parser.h"
 #include "list.h"
 #include "util.h"
 #include "log.h"
@@ -108,6 +109,8 @@ static int wait_for_one_process(int block)
     }
 
     svc->flags |= SVC_RESTARTING;
+
+    init_parse_config_file("/init.rc");
 
     /* Execute all onrestart commands for this service. */
     list_for_each(node, &svc->onrestart.commands) {
