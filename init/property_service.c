@@ -95,6 +95,7 @@ struct {
     unsigned int gid;
 } control_perms[] = {
     { "dumpstate",AID_SHELL, AID_LOG },
+    { "pppd_gprs:",AID_RADIO, AID_RADIO },
      {NULL, 0, 0 }
 };
 
@@ -203,12 +204,31 @@ static int property_write(prop_info *pi, const char *value)
  */
 static int check_control_perms(const char *name, unsigned int uid, unsigned int gid) {
     int i;
+    int i, nlen, slen;
+    char *ncolon, *scolon;
     if (uid == AID_SYSTEM || uid == AID_ROOT)
         return 1;
 
+    /* Check for dynamic arguments */
+    ncolon = strchr(name, ':');
+    if (ncolon)
+        nlen = ncolon - name;
+    else
+        nlen = strlen(name);
+
     /* Search the ACL */
     for (i = 0; control_perms[i].service; i++) {
-        if (strcmp(control_perms[i].service, name) == 0) {
+        scolon = strchr(control_perms[i].service, ':');
+        if (scolon)
+            slen = scolon - control_perms[i].service;
+        else
+            slen = strlen(control_perms[i].service);
+        if (nlen != slen)
+            continue;
+        /* perms must have colon to allow dynamic args */
+        if (ncolon && !scolon)
+            continue;
+        if (strncmp(control_perms[i].service, name, nlen) == 0) {
             if ((uid && control_perms[i].uid == uid) ||
                 (gid && control_perms[i].gid == gid)) {
                 return 1;
