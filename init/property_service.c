@@ -203,7 +203,6 @@ static int property_write(prop_info *pi, const char *value)
  * Returns 1 if uid allowed, 0 otherwise.
  */
 static int check_control_perms(const char *name, unsigned int uid, unsigned int gid) {
-    int i;
     int i, nlen, slen;
     char *ncolon, *scolon;
     if (uid == AID_SYSTEM || uid == AID_ROOT)
