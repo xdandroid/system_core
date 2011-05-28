@@ -31,6 +31,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <sys/reboot.h>
 #include <libgen.h>
 
 #include <cutils/sockets.h>
@@ -347,9 +348,9 @@ static void stop_system()
 
     svc = service_find_by_name("servicemanager");
     service_stop(svc);
-    usleep(50000);
+    usleep(20000);
     service_for_each(service_stop);
-    usleep(10000);
+    usleep(100000);
     sync();
     umount2("/data", MNT_FORCE);
 }
@@ -370,6 +371,15 @@ static void do_reboot(const char *arg)
         reboot(RB_AUTOBOOT);
 }
 
+static void do_kexec()
+{
+    char *argv[] = { "/system/xbin/kexec.sh", NULL  };
+    stop_system();
+    execve(argv[0], argv, (char **)ENV);
+    ERROR("kexec.sh failed, errno %d: %s\n", errno, strerror(errno));
+    exit(1);
+}
+
 static void msg_start(const char *name)
 {
     struct service *svc;
@@ -379,6 +389,8 @@ static void msg_start(const char *name)
     /* No return from these cases */
     if (!strcmp(name, "shutdown"))
         do_shutdown();
+    else if (!strcmp(name, "kexec"))
+        do_kexec();
     else if (!strncmp(name, "reboot:", 7))
         do_reboot(name+7);
     else if (!strcmp(name, "reboot"))
