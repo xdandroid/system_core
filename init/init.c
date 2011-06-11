@@ -345,6 +345,7 @@ static void restart_processes()
 static void stop_system()
 {
     struct service *svc;
+    int i = 0;
 
     svc = service_find_by_name("servicemanager");
     service_stop(svc);
@@ -352,7 +353,11 @@ static void stop_system()
     service_for_each(service_stop);
     usleep(100000);
     sync();
-    umount2("/data", MNT_FORCE);
+    while (umount("/data") && errno == EBUSY) {
+	usleep(100000);
+	i++;
+	if (i > 5) break;
+    }
 }
 
 static void do_shutdown()
