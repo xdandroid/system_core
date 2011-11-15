@@ -31,6 +31,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <sys/reboot.h>
 #include <libgen.h>
 
 #include <cutils/sockets.h>
@@ -341,11 +342,64 @@ static void restart_processes()
                            restart_service_if_needed);
 }
 
+static void stop_system()
+{
+    struct service *svc;
+    int i = 0;
+
+    svc = service_find_by_name("servicemanager");
+    service_stop(svc);
+    usleep(20000);
+    service_for_each(service_stop);
+    usleep(100000);
+    sync();
+    while (umount("/data") && errno == EBUSY) {
+	usleep(100000);
+	i++;
+	if (i > 5) break;
+    }
+}
+
+static void do_shutdown()
+{
+    stop_system();
+    reboot(RB_POWER_OFF);
+}
+
+static void do_reboot(const char *arg)
+{
+    stop_system();
+    if (arg && *arg)
+        __reboot(LINUX_REBOOT_MAGIC1, LINUX_REBOOT_MAGIC2,
+            LINUX_REBOOT_CMD_RESTART2, (void *)arg);
+    else
+        reboot(RB_AUTOBOOT);
+}
+
+static void do_kexec()
+{
+    char *argv[] = { "/system/xbin/kexec.sh", NULL  };
+    stop_system();
+    execve(argv[0], argv, (char **)ENV);
+    ERROR("kexec.sh failed, errno %d: %s\n", errno, strerror(errno));
+    exit(1);
+}
+
 static void msg_start(const char *name)
 {
     struct service *svc;
     char *tmp = NULL;
     char *args = NULL;
+
+    /* No return from these cases */
+    if (!strcmp(name, "shutdown"))
+        do_shutdown();
+    else if (!strcmp(name, "kexec"))
+        do_kexec();
+    else if (!strncmp(name, "reboot:", 7))
+        do_reboot(name+7);
+    else if (!strcmp(name, "reboot"))
+        do_reboot(NULL);
 
     if (!strchr(name, ':'))
         svc = service_find_by_name(name);
